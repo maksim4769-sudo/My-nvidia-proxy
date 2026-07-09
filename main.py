@@ -84,11 +84,12 @@ async def chat_completions(request: ChatRequest):
         if request.presence_penalty != 0.0:
             params["presence_penalty"] = request.presence_penalty
         
-        # 🔥 ВКЛЮЧАЕМ REASONING ДЛЯ GLM-5.2
+        # 🔥 ВКЛЮЧАЕМ REASONING ДЛЯ GLM-5.2 (ПРОВЕРЕННЫЙ СПОСОБ)
         if "glm-5.2" in request.model.lower():
             params["extra_body"] = {
-                "thinking": {"type": "enabled"},
-                "reasoning_effort": "max"  # max, medium, low
+                "chat_template_kwargs": {
+                    "enable_thinking": True
+                }
             }
         
         completion = client.chat.completions.create(**params)
@@ -98,12 +99,22 @@ async def chat_completions(request: ChatRequest):
             def generate():
                 for chunk in completion:
                     if chunk.choices and chunk.choices[0].delta.content:
-                        yield f"data: {json.dumps({'choices': [{'delta': {'content': chunk.choices[0].delta.content}}]})}\n\n"
+                        # Пробуем извлечь reasoning_content, если есть
+                        delta = chunk.choices[0].delta
+                        response_data = {"choices": [{"delta": {}}]}
+                        
+                        if hasattr(delta, 'content') and delta.content:
+                            response_data["choices"][0]["delta"]["content"] = delta.content
+                        
+                        if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
+                            response_data["choices"][0]["delta"]["reasoning_content"] = delta.reasoning_content
+                        
+                        yield f"data: {json.dumps(response_data)}\n\n"
                 yield "data: [DONE]\n\n"
             return StreamingResponse(generate(), media_type="text/event-stream")
         
         # Обычный ответ
-        return JSONResponse({
+        response_data = {
             "choices": [
                 {
                     "message": {
@@ -119,7 +130,13 @@ async def chat_completions(request: ChatRequest):
                 "completion_tokens": 0,
                 "total_tokens": 0
             }
-        })
+        }
+        
+        # Если есть reasoning_content, добавляем его в ответ
+        if hasattr(completion.choices[0].message, 'reasoning_content'):
+            response_data["choices"][0]["message"]["reasoning_content"] = completion.choices[0].message.reasoning_content
+        
+        return JSONResponse(response_data)
         
     except Exception as e:
         return JSONResponse(
