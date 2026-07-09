@@ -10,7 +10,7 @@ import sys
 
 app = FastAPI()
 
-# Настройка CORS с поддержкой всех методов
+# Настройка CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -68,7 +68,6 @@ async def chat_completions(request: ChatRequest):
     try:
         print("=" * 50)
         print(f"📥 Получен запрос для модели: {request.model}")
-        print(f"📝 Сообщений: {len(request.messages)}")
         
         # Базовые параметры для NVIDIA
         params = {
@@ -100,32 +99,57 @@ async def chat_completions(request: ChatRequest):
         completion = client.chat.completions.create(**params)
         print("✅ Ответ от NVIDIA получен")
         
-        # Проверяем, есть ли reasoning в ответе
-        has_reasoning = hasattr(completion.choices[0].message, 'reasoning_content')
-        if has_reasoning:
-            reasoning = completion.choices[0].message.reasoning_content
-            print(f"🧠 Reasoning найден! Длина: {len(reasoning)} символов")
-            print(f"🧠 Содержание: {reasoning[:200]}...")
+        # 🔍 БЕЗОПАСНОЕ ИЗВЛЕЧЕНИЕ ДАННЫХ
+        # Проверяем структуру ответа
+        if not hasattr(completion, 'choices') or not completion.choices:
+            print("❌ Нет поля choices в ответе")
+            raise ValueError("Invalid response format: missing choices")
+        
+        choice = completion.choices[0]
+        message = getattr(choice, 'message', None)
+        if not message:
+            print("❌ Нет поля message в ответе")
+            raise ValueError("Invalid response format: missing message")
+        
+        # Извлекаем content и reasoning_content
+        content = getattr(message, 'content', '')
+        reasoning_content = getattr(message, 'reasoning_content', None)
+        
+        print(f"📝 Длина контента: {len(content)} символов")
+        if reasoning_content:
+            print(f"🧠 Reasoning найден! Длина: {len(reasoning_content)} символов")
         else:
             print("❌ Reasoning ОТСУТСТВУЕТ в ответе NVIDIA")
         
         # Обработка стриминга
         if request.stream:
             def generate():
-                for chunk in completion:
-                    if chunk.choices and chunk.choices[0].delta.content:
-                        delta = chunk.choices[0].delta
+                try:
+                    for chunk in completion:
+                        if not hasattr(chunk, 'choices') or not chunk.choices:
+                            continue
+                        delta = getattr(chunk.choices[0], 'delta', None)
+                        if not delta:
+                            continue
+                        
                         response_data = {"choices": [{"delta": {}}]}
                         
-                        if hasattr(delta, 'content') and delta.content:
-                            response_data["choices"][0]["delta"]["content"] = delta.content
+                        delta_content = getattr(delta, 'content', None)
+                        if delta_content:
+                            response_data["choices"][0]["delta"]["content"] = delta_content
                         
-                        if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
+                        delta_reasoning = getattr(delta, 'reasoning_content', None)
+                        if delta_reasoning:
                             print("🧠 Reasoning в стриминге")
-                            response_data["choices"][0]["delta"]["reasoning_content"] = delta.reasoning_content
+                            response_data["choices"][0]["delta"]["reasoning_content"] = delta_reasoning
                         
                         yield f"data: {json.dumps(response_data)}\n\n"
-                yield "data: [DONE]\n\n"
+                except Exception as e:
+                    print(f"❌ Ошибка в стриминге: {str(e)}")
+                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                finally:
+                    yield "data: [DONE]\n\n"
+            
             return StreamingResponse(generate(), media_type="text/event-stream")
         
         # Обычный ответ
@@ -134,7 +158,7 @@ async def chat_completions(request: ChatRequest):
                 {
                     "message": {
                         "role": "assistant",
-                        "content": completion.choices[0].message.content
+                        "content": content
                     },
                     "finish_reason": "stop",
                     "index": 0
@@ -147,14 +171,16 @@ async def chat_completions(request: ChatRequest):
             }
         }
         
-        if has_reasoning:
-            response_data["choices"][0]["message"]["reasoning_content"] = completion.choices[0].message.reasoning_content
+        if reasoning_content:
+            response_data["choices"][0]["message"]["reasoning_content"] = reasoning_content
         
         print("📤 Отправка ответа клиенту")
         return JSONResponse(response_data)
         
     except Exception as e:
         print(f"❌ ОШИБКА: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return JSONResponse(
             status_code=500,
             content={
