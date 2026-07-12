@@ -36,7 +36,7 @@ class ChatRequest(BaseModel):
     messages: list
     temperature: float = 1.0
     max_tokens: int = 16384
-    stream: bool = False
+    stream: bool = True
     top_p: float = 1.0
     frequency_penalty: float = 0.0
     presence_penalty: float = 0.0
