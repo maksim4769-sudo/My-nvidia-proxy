@@ -41,7 +41,7 @@ class ChatRequest(BaseModel):
     frequency_penalty: float = 0.0
     presence_penalty: float = 0.0
 
-# 🔥 НОВЫЙ ЭНДПОИНТ ДЛЯ CHUB.AI
+# Эндпоинт для получения списка моделей (Chub.ai, SillyTavern)
 @app.get("/v1/models")
 async def list_models():
     """Возвращает список доступных моделей для Chub.ai"""
@@ -50,6 +50,18 @@ async def list_models():
         "data": [
             {
                 "id": "z-ai/glm-5.2",
+                "object": "model",
+                "created": 1700000000,
+                "owned_by": "nvidia"
+            },
+            {
+                "id": "deepseek-ai/deepseek-v4-flash",
+                "object": "model",
+                "created": 1700000000,
+                "owned_by": "nvidia"
+            },
+            {
+                "id": "deepseek-ai/deepseek-v4-pro",
                 "object": "model",
                 "created": 1700000000,
                 "owned_by": "nvidia"
@@ -120,8 +132,10 @@ async def chat_completions(request: ChatRequest):
         if request.presence_penalty != 0.0:
             params["presence_penalty"] = request.presence_penalty
         
-        # 🔥 МАКСИМАЛЬНЫЙ REASONING ДЛЯ GLM-5.2
-        if "glm-5.2" in request.model.lower():
+        # 🧠 ВКЛЮЧАЕМ REASONING В ЗАВИСИМОСТИ ОТ МОДЕЛИ
+        model_lower = request.model.lower()
+        
+        if "glm-5.2" in model_lower:
             print("🧠 Активация МАКСИМАЛЬНОГО reasoning для GLM-5.2")
             params["extra_body"] = {
                 "chat_template_kwargs": {
@@ -129,6 +143,39 @@ async def chat_completions(request: ChatRequest):
                 },
                 "reasoning_effort": "max"
             }
+        
+        elif "deepseek-v4-flash" in model_lower:
+            print("🧠 Активация МАКСИМАЛЬНОГО reasoning для DeepSeek V4 Flash")
+            params["extra_body"] = {
+                "chat_template_kwargs": {
+                    "thinking": True,
+                    "reasoning_effort": "max"   # high или max
+                }
+            }
+        
+        elif "deepseek-v4-pro" in model_lower:
+            print("🧠 Активация МАКСИМАЛЬНОГО reasoning для DeepSeek V4 Pro")
+            # Основной способ — через корневой параметр
+            params["reasoning_effort"] = "max"
+            # Запасной вариант (если не сработает)
+            params["extra_body"] = {
+                "chat_template_kwargs": {
+                    "thinking": True,
+                    "reasoning_effort": "max"
+                }
+            }
+        
+        # Универсальная обработка для любых deepseek-v4 (если не попали в конкретные)
+        elif "deepseek-v4" in model_lower:
+            print("🧠 Активация reasoning для DeepSeek V4 (общий случай)")
+            params["reasoning_effort"] = "max"
+            if "extra_body" not in params:
+                params["extra_body"] = {
+                    "chat_template_kwargs": {
+                        "thinking": True,
+                        "reasoning_effort": "max"
+                    }
+                }
         
         print("🔄 Отправка запроса в NVIDIA...")
         completion = client.chat.completions.create(**params)
@@ -145,13 +192,13 @@ async def chat_completions(request: ChatRequest):
             print("❌ Нет поля message в ответе")
             raise ValueError("Invalid response format: missing message")
         
-        # Извлекаем content и reasoning_content
+        # Извлекаем content и reasoning (у разных моделей поле может называться по-разному)
         content = getattr(message, 'content', '')
-        reasoning_content = getattr(message, 'reasoning_content', None)
+        reasoning = getattr(message, 'reasoning_content', None) or getattr(message, 'reasoning', None)
         
         print(f"📝 Длина контента: {len(content)} символов")
-        if reasoning_content:
-            print(f"🧠 Reasoning найден! Длина: {len(reasoning_content)} символов")
+        if reasoning:
+            print(f"🧠 Reasoning найден! Длина: {len(reasoning)} символов")
         else:
             print("❌ Reasoning ОТСУТСТВУЕТ в ответе NVIDIA")
         
@@ -172,7 +219,8 @@ async def chat_completions(request: ChatRequest):
                         if delta_content:
                             response_data["choices"][0]["delta"]["content"] = delta_content
                         
-                        delta_reasoning = getattr(delta, 'reasoning_content', None)
+                        # Ищем reasoning в стриме
+                        delta_reasoning = getattr(delta, 'reasoning_content', None) or getattr(delta, 'reasoning', None)
                         if delta_reasoning:
                             print("🧠 Reasoning в стриминге")
                             response_data["choices"][0]["delta"]["reasoning_content"] = delta_reasoning
@@ -205,8 +253,8 @@ async def chat_completions(request: ChatRequest):
             }
         }
         
-        if reasoning_content:
-            response_data["choices"][0]["message"]["reasoning_content"] = reasoning_content
+        if reasoning:
+            response_data["choices"][0]["message"]["reasoning_content"] = reasoning
         
         print("📤 Отправка ответа клиенту")
         return JSONResponse(response_data)
