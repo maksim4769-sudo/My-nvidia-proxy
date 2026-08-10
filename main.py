@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
-from openai import OpenAI
+from openai import OpenAI, APIError
 import os
 import uvicorn
 import json
@@ -41,65 +41,24 @@ class ChatRequest(BaseModel):
     frequency_penalty: float = 0.0
     presence_penalty: float = 0.0
 
-# Эндпоинт для получения списка моделей (Chub.ai, SillyTavern)
+# Эндпоинт для получения списка моделей
 @app.get("/v1/models")
 async def list_models():
-    """Возвращает список доступных моделей для Chub.ai"""
     return JSONResponse({
         "object": "list",
         "data": [
-            {
-                "id": "z-ai/glm-5.2",
-                "object": "model",
-                "created": 1700000000,
-                "owned_by": "nvidia"
-            },
-            {
-                "id": "deepseek-ai/deepseek-v4-flash",
-                "object": "model",
-                "created": 1700000000,
-                "owned_by": "nvidia"
-            },
-            {
-                "id": "deepseek-ai/deepseek-v4-pro",
-                "object": "model",
-                "created": 1700000000,
-                "owned_by": "nvidia"
-            },
-            {
-                "id": "meta/llama-3.1-8b-instruct",
-                "object": "model",
-                "created": 1700000000,
-                "owned_by": "nvidia"
-            },
-            {
-                "id": "meta/llama-3.1-70b-instruct",
-                "object": "model",
-                "created": 1700000000,
-                "owned_by": "nvidia"
-            },
-            {
-                "id": "nvidia/nemotron-mini-4b-instruct",
-                "object": "model",
-                "created": 1700000000,
-                "owned_by": "nvidia"
-            }
+            {"id": "z-ai/glm-5.2", "object": "model", "created": 1700000000, "owned_by": "nvidia"},
+            {"id": "deepseek-ai/deepseek-v4-flash", "object": "model", "created": 1700000000, "owned_by": "nvidia"},
+            {"id": "deepseek-ai/deepseek-v4-pro", "object": "model", "created": 1700000000, "owned_by": "nvidia"},
+            {"id": "meta/llama-3.1-8b-instruct", "object": "model", "created": 1700000000, "owned_by": "nvidia"},
+            {"id": "meta/llama-3.1-70b-instruct", "object": "model", "created": 1700000000, "owned_by": "nvidia"},
+            {"id": "nvidia/nemotron-mini-4b-instruct", "object": "model", "created": 1700000000, "owned_by": "nvidia"}
         ]
     })
 
 @app.options("/v1/chat/completions")
-async def options_chat():
-    return JSONResponse(
-        content={},
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-        }
-    )
-
 @app.options("/{path:path}")
-async def options_all(path: str):
+async def options_all(path: str = ""):
     return JSONResponse(
         content={},
         headers={
@@ -115,7 +74,7 @@ async def chat_completions(request: ChatRequest):
         print("=" * 50)
         print(f"📥 Получен запрос для модели: {request.model}")
         
-        # Базовые параметры для NVIDIA
+        # Базовые параметры
         params = {
             "model": request.model,
             "messages": request.messages,
@@ -123,86 +82,97 @@ async def chat_completions(request: ChatRequest):
             "max_tokens": request.max_tokens,
             "stream": request.stream
         }
-        
-        # Добавляем опциональные параметры
         if request.top_p != 1.0:
             params["top_p"] = request.top_p
         if request.frequency_penalty != 0.0:
             params["frequency_penalty"] = request.frequency_penalty
         if request.presence_penalty != 0.0:
             params["presence_penalty"] = request.presence_penalty
-        
-        # 🧠 ВКЛЮЧАЕМ REASONING В ЗАВИСИМОСТИ ОТ МОДЕЛИ
+
+        # Настройка reasoning для конкретных моделей
         model_lower = request.model.lower()
-        
         if "glm-5.2" in model_lower:
-            print("🧠 Активация МАКСИМАЛЬНОГО reasoning для GLM-5.2")
+            print("🧠 Активация reasoning для GLM-5.2")
             params["extra_body"] = {
-                "chat_template_kwargs": {
-                    "enable_thinking": True
-                },
+                "chat_template_kwargs": {"enable_thinking": True},
                 "reasoning_effort": "max"
             }
-        
         elif "deepseek-v4-flash" in model_lower:
-            print("🧠 Активация МАКСИМАЛЬНОГО reasoning для DeepSeek V4 Flash")
+            print("🧠 Активация reasoning для DeepSeek V4 Flash")
             params["extra_body"] = {
-                "chat_template_kwargs": {
-                    "thinking": True,
-                    "reasoning_effort": "max"   # high или max
-                }
+                "chat_template_kwargs": {"thinking": True, "reasoning_effort": "max"}
             }
-        
         elif "deepseek-v4-pro" in model_lower:
-            print("🧠 Активация МАКСИМАЛЬНОГО reasoning для DeepSeek V4 Pro")
-            # Основной способ — через корневой параметр
+            print("🧠 Активация reasoning для DeepSeek V4 Pro")
             params["reasoning_effort"] = "max"
-            # Запасной вариант (если не сработает)
             params["extra_body"] = {
-                "chat_template_kwargs": {
-                    "thinking": True,
-                    "reasoning_effort": "max"
-                }
+                "chat_template_kwargs": {"thinking": True, "reasoning_effort": "max"}
             }
-        
-        # Универсальная обработка для любых deepseek-v4 (если не попали в конкретные)
         elif "deepseek-v4" in model_lower:
-            print("🧠 Активация reasoning для DeepSeek V4 (общий случай)")
+            print("🧠 Активация reasoning для DeepSeek V4 (общий)")
             params["reasoning_effort"] = "max"
             if "extra_body" not in params:
                 params["extra_body"] = {
-                    "chat_template_kwargs": {
-                        "thinking": True,
-                        "reasoning_effort": "max"
+                    "chat_template_kwargs": {"thinking": True, "reasoning_effort": "max"}
+                }
+
+        print("🔄 Отправка запроса в NVIDIA...")
+        try:
+            completion = client.chat.completions.create(**params)
+        except APIError as e:
+            print(f"❌ Ошибка API NVIDIA: {str(e)}")
+            # Попытаемся извлечь тело ошибки
+            error_body = getattr(e, 'body', None)
+            if error_body:
+                print(f"Тело ошибки: {error_body}")
+            return JSONResponse(
+                status_code=e.status_code or 500,
+                content={"error": {"message": str(e), "type": "api_error"}}
+            )
+        except Exception as e:
+            print(f"❌ Неизвестная ошибка при вызове OpenAI: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return JSONResponse(
+                status_code=500,
+                content={"error": {"message": str(e), "type": "internal_error"}}
+            )
+
+        # Проверка корректности ответа
+        if not hasattr(completion, 'choices') or not completion.choices:
+            print("❌ Ответ не содержит choices. Полный ответ:")
+            print(completion)
+            # Возвращаем детали ошибки
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error": {
+                        "message": "Invalid response format: missing choices",
+                        "type": "api_error",
+                        "raw_response": str(completion)  # для отладки
                     }
                 }
-        
-        print("🔄 Отправка запроса в NVIDIA...")
-        completion = client.chat.completions.create(**params)
-        print("✅ Ответ от NVIDIA получен")
-        
-        # Безопасное извлечение данных
-        if not hasattr(completion, 'choices') or not completion.choices:
-            print("❌ Нет поля choices в ответе")
-            raise ValueError("Invalid response format: missing choices")
-        
+            )
+
         choice = completion.choices[0]
         message = getattr(choice, 'message', None)
         if not message:
             print("❌ Нет поля message в ответе")
-            raise ValueError("Invalid response format: missing message")
-        
-        # Извлекаем content и reasoning (у разных моделей поле может называться по-разному)
+            return JSONResponse(
+                status_code=500,
+                content={"error": {"message": "Missing message in response", "type": "api_error"}}
+            )
+
         content = getattr(message, 'content', '')
         reasoning = getattr(message, 'reasoning_content', None) or getattr(message, 'reasoning', None)
-        
+
         print(f"📝 Длина контента: {len(content)} символов")
         if reasoning:
             print(f"🧠 Reasoning найден! Длина: {len(reasoning)} символов")
         else:
-            print("❌ Reasoning ОТСУТСТВУЕТ в ответе NVIDIA")
-        
-        # Обработка стриминга — ИСПРАВЛЕНО: async def generate()
+            print("❌ Reasoning отсутствует")
+
+        # Обработка стриминга (исправленный асинхронный генератор)
         if request.stream:
             async def generate():
                 try:
@@ -212,28 +182,22 @@ async def chat_completions(request: ChatRequest):
                         delta = getattr(chunk.choices[0], 'delta', None)
                         if not delta:
                             continue
-                        
                         response_data = {"choices": [{"delta": {}}]}
-                        
                         delta_content = getattr(delta, 'content', None)
                         if delta_content:
                             response_data["choices"][0]["delta"]["content"] = delta_content
-                        
-                        # Ищем reasoning в стриме
                         delta_reasoning = getattr(delta, 'reasoning_content', None) or getattr(delta, 'reasoning', None)
                         if delta_reasoning:
                             print("🧠 Reasoning в стриминге")
                             response_data["choices"][0]["delta"]["reasoning_content"] = delta_reasoning
-                        
                         yield f"data: {json.dumps(response_data)}\n\n"
                 except Exception as e:
                     print(f"❌ Ошибка в стриминге: {str(e)}")
                     yield f"data: {json.dumps({'error': str(e)})}\n\n"
                 finally:
                     yield "data: [DONE]\n\n"
-            
             return StreamingResponse(generate(), media_type="text/event-stream")
-        
+
         # Обычный ответ
         response_data = {
             "choices": [
@@ -252,25 +216,19 @@ async def chat_completions(request: ChatRequest):
                 "total_tokens": 0
             }
         }
-        
         if reasoning:
             response_data["choices"][0]["message"]["reasoning_content"] = reasoning
-        
+
         print("📤 Отправка ответа клиенту")
         return JSONResponse(response_data)
-        
+
     except Exception as e:
-        print(f"❌ ОШИБКА: {str(e)}")
+        print(f"❌ Критическая ошибка: {str(e)}")
         import traceback
         traceback.print_exc()
         return JSONResponse(
             status_code=500,
-            content={
-                "error": {
-                    "message": str(e),
-                    "type": "api_error"
-                }
-            }
+            content={"error": {"message": str(e), "type": "internal_error"}}
         )
 
 @app.get("/")
