@@ -10,7 +10,7 @@ import sys
 
 app = FastAPI()
 
-# Настройка CORS
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,7 +20,7 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-# Инициализация клиента NVIDIA
+# NVIDIA клиент
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
 if not NVIDIA_API_KEY:
     raise RuntimeError("NVIDIA_API_KEY environment variable is not set")
@@ -30,7 +30,6 @@ client = OpenAI(
     api_key=NVIDIA_API_KEY
 )
 
-# Модель для запроса от JanitorAI
 class ChatRequest(BaseModel):
     model: str
     messages: list
@@ -41,7 +40,6 @@ class ChatRequest(BaseModel):
     frequency_penalty: float = 0.0
     presence_penalty: float = 0.0
 
-# Эндпоинт для получения списка моделей
 @app.get("/v1/models")
 async def list_models():
     return JSONResponse({
@@ -73,8 +71,8 @@ async def chat_completions(request: ChatRequest):
     try:
         print("=" * 50)
         print(f"📥 Получен запрос для модели: {request.model}")
-        
-        # Базовые параметры
+
+        # Формируем параметры
         params = {
             "model": request.model,
             "messages": request.messages,
@@ -89,7 +87,7 @@ async def chat_completions(request: ChatRequest):
         if request.presence_penalty != 0.0:
             params["presence_penalty"] = request.presence_penalty
 
-        # Настройка reasoning для конкретных моделей
+        # Reasoning
         model_lower = request.model.lower()
         if "glm-5.2" in model_lower:
             print("🧠 Активация reasoning для GLM-5.2")
@@ -121,13 +119,12 @@ async def chat_completions(request: ChatRequest):
             completion = client.chat.completions.create(**params)
         except APIError as e:
             print(f"❌ Ошибка API NVIDIA: {str(e)}")
-            # Попытаемся извлечь тело ошибки
             error_body = getattr(e, 'body', None)
             if error_body:
                 print(f"Тело ошибки: {error_body}")
             return JSONResponse(
                 status_code=e.status_code or 500,
-                content={"error": {"message": str(e), "type": "api_error"}}
+                content={"error": {"message": str(e), "type": "api_error", "raw_response": str(error_body)}}
             )
         except Exception as e:
             print(f"❌ Неизвестная ошибка при вызове OpenAI: {str(e)}")
@@ -138,18 +135,39 @@ async def chat_completions(request: ChatRequest):
                 content={"error": {"message": str(e), "type": "internal_error"}}
             )
 
-        # Проверка корректности ответа
+        # ===== ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА ОТВЕТА =====
+        # Если ответ не содержит choices – вероятно, это ошибка от NVIDIA в виде JSON
         if not hasattr(completion, 'choices') or not completion.choices:
-            print("❌ Ответ не содержит choices. Полный ответ:")
-            print(completion)
-            # Возвращаем детали ошибки
+            print("❌ Ответ не содержит choices. Полный объект completion:")
+            # Пытаемся вывести структуру
+            try:
+                if hasattr(completion, 'model_dump'):
+                    dump = completion.model_dump()
+                    print(json.dumps(dump, indent=2, default=str))
+                    raw = dump
+                else:
+                    raw = vars(completion)
+                    print(raw)
+            except Exception as e:
+                print(f"Не удалось сериализовать completion: {e}")
+                raw = str(completion)
+                print(raw)
+
+            # Если в объекте есть поле error – извлечём его
+            error_msg = "Invalid response format: missing choices"
+            if hasattr(completion, 'error'):
+                error_msg = str(completion.error)
+            elif hasattr(completion, 'get') and callable(completion.get):
+                if completion.get('error'):
+                    error_msg = str(completion['error'])
+
             return JSONResponse(
                 status_code=500,
                 content={
                     "error": {
-                        "message": "Invalid response format: missing choices",
+                        "message": error_msg,
                         "type": "api_error",
-                        "raw_response": str(completion)  # для отладки
+                        "raw_response": raw
                     }
                 }
             )
@@ -172,7 +190,7 @@ async def chat_completions(request: ChatRequest):
         else:
             print("❌ Reasoning отсутствует")
 
-        # Обработка стриминга (исправленный асинхронный генератор)
+        # Стриминг
         if request.stream:
             async def generate():
                 try:
