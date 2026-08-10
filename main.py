@@ -202,9 +202,9 @@ async def chat_completions(request: ChatRequest):
         else:
             print("❌ Reasoning ОТСУТСТВУЕТ в ответе NVIDIA")
         
-        # Обработка стриминга
+        # Обработка стриминга — ИСПРАВЛЕНО: async def generate()
         if request.stream:
-            def generate():
+            async def generate():
                 try:
                     for chunk in completion:
                         if not hasattr(chunk, 'choices') or not chunk.choices:
