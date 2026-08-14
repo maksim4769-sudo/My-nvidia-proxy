@@ -7,11 +7,7 @@ import os
 import uvicorn
 import json
 
-app = FastAPI(title="NVIDIA Proxy for ChubAI")
-
-# ============================================================
-# CORS
-# ============================================================
+app = FastAPI(title="NVIDIA Proxy for JanitorAI")
 
 app.add_middleware(
     CORSMiddleware,
@@ -21,10 +17,6 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
-
-# ============================================================
-# NVIDIA CLIENT
-# ============================================================
 
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
 
@@ -36,110 +28,65 @@ client = OpenAI(
     api_key=NVIDIA_API_KEY
 )
 
-# ============================================================
-# REQUEST MODEL
-# ============================================================
 
 class ChatRequest(BaseModel):
     model: str
     messages: list
-
     temperature: float = 1.0
     max_tokens: int = 16384
     stream: bool = False
-
     top_p: float = 1.0
     frequency_penalty: float = 0.0
     presence_penalty: float = 0.0
 
-
-# ============================================================
-# MODELS
-# ============================================================
 
 @app.get("/v1/models")
 async def list_models():
     return JSONResponse({
         "object": "list",
         "data": [
-
-            # ----------------------------------------------------
-            # GLM
-            # ----------------------------------------------------
-
             {
                 "id": "z-ai/glm-5.2",
                 "object": "model",
                 "created": 1700000000,
                 "owned_by": "nvidia"
             },
-
-            # ----------------------------------------------------
-            # MINIMAX M3
-            # ----------------------------------------------------
-
             {
                 "id": "minimaxai/minimax-m3",
                 "object": "model",
                 "created": 1700000000,
                 "owned_by": "nvidia"
             },
-
-            # ----------------------------------------------------
-            # THINKING MACHINES INKLING
-            # ----------------------------------------------------
-
             {
                 "id": "thinkingmachines/inkling",
                 "object": "model",
                 "created": 1700000000,
                 "owned_by": "nvidia"
             },
-
-            # ----------------------------------------------------
-            # DEEPSEEK V4 FLASH
-            # ----------------------------------------------------
-
             {
                 "id": "deepseek-ai/deepseek-v4-flash",
                 "object": "model",
                 "created": 1700000000,
                 "owned_by": "nvidia"
             },
-
-            # ----------------------------------------------------
-            # DEEPSEEK V4 PRO
-            # ----------------------------------------------------
-
             {
                 "id": "deepseek-ai/deepseek-v4-pro",
                 "object": "model",
                 "created": 1700000000,
                 "owned_by": "nvidia"
             },
-
-            # ----------------------------------------------------
-            # LLAMA
-            # ----------------------------------------------------
-
             {
                 "id": "meta/llama-3.1-8b-instruct",
                 "object": "model",
                 "created": 1700000000,
                 "owned_by": "nvidia"
             },
-
             {
                 "id": "meta/llama-3.1-70b-instruct",
                 "object": "model",
                 "created": 1700000000,
                 "owned_by": "nvidia"
             },
-
-            # ----------------------------------------------------
-            # NEMOTRON
-            # ----------------------------------------------------
-
             {
                 "id": "nvidia/nemotron-mini-4b-instruct",
                 "object": "model",
@@ -149,10 +96,6 @@ async def list_models():
         ]
     })
 
-
-# ============================================================
-# OPTIONS / CORS
-# ============================================================
 
 @app.options("/v1/chat/completions")
 @app.options("/{path:path}")
@@ -167,23 +110,13 @@ async def options_all(path: str = ""):
     )
 
 
-# ============================================================
-# CHAT COMPLETIONS
-# ============================================================
-
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatRequest):
-
     try:
-
         print("=" * 60)
-        print(f"📥 Запрос модели: {request.model}")
-        print(f"🌊 Streaming: {request.stream}")
-        print(f"🧠 Max tokens: {request.max_tokens}")
-
-        # ========================================================
-        # ПАРАМЕТРЫ ЗАПРОСА
-        # ========================================================
+        print(f"Request model: {request.model}")
+        print(f"Streaming: {request.stream}")
+        print(f"Max tokens: {request.max_tokens}")
 
         params = {
             "model": request.model,
@@ -202,19 +135,10 @@ async def chat_completions(request: ChatRequest):
         if request.presence_penalty != 0.0:
             params["presence_penalty"] = request.presence_penalty
 
-        # ========================================================
-        # REASONING
-        # ========================================================
-
         model_lower = request.model.lower()
 
-        # --------------------------------------------------------
-        # GLM-5.2
-        # --------------------------------------------------------
-
         if "glm-5.2" in model_lower:
-
-            print("🧠 GLM-5.2: включаем reasoning")
+            print("GLM-5.2: reasoning enabled")
 
             params["extra_body"] = {
                 "chat_template_kwargs": {
@@ -223,16 +147,8 @@ async def chat_completions(request: ChatRequest):
                 "reasoning_effort": "max"
             }
 
-        # --------------------------------------------------------
-        # MINIMAX M3
-        # --------------------------------------------------------
-
-        elif (
-            "minimax-m3" in model_lower
-            or "minimax_m3" in model_lower
-        ):
-
-            print("🧠 MiniMax M3: native reasoning")
+        elif "minimax-m3" in model_lower or "minimax_m3" in model_lower:
+            print("MiniMax M3: native reasoning")
 
             params["extra_body"] = {
                 "chat_template_kwargs": {
@@ -240,13 +156,8 @@ async def chat_completions(request: ChatRequest):
                 }
             }
 
-        # --------------------------------------------------------
-        # DEEPSEEK V4 FLASH
-        # --------------------------------------------------------
-
         elif "deepseek-v4-flash" in model_lower:
-
-            print("🧠 DeepSeek V4 Flash: включаем reasoning")
+            print("DeepSeek V4 Flash: reasoning enabled")
 
             params["extra_body"] = {
                 "chat_template_kwargs": {
@@ -254,14 +165,9 @@ async def chat_completions(request: ChatRequest):
                     "reasoning_effort": "max"
                 }
             }
-
-        # --------------------------------------------------------
-        # DEEPSEEK V4 PRO
-        # --------------------------------------------------------
 
         elif "deepseek-v4-pro" in model_lower:
-
-            print("🧠 DeepSeek V4 Pro: включаем reasoning")
+            print("DeepSeek V4 Pro: reasoning enabled")
 
             params["reasoning_effort"] = "max"
 
@@ -271,14 +177,9 @@ async def chat_completions(request: ChatRequest):
                     "reasoning_effort": "max"
                 }
             }
-
-        # --------------------------------------------------------
-        # DEEPSEEK V4
-        # --------------------------------------------------------
 
         elif "deepseek-v4" in model_lower:
-
-            print("🧠 DeepSeek V4: включаем reasoning")
+            print("DeepSeek V4: reasoning enabled")
 
             params["reasoning_effort"] = "max"
 
@@ -289,39 +190,22 @@ async def chat_completions(request: ChatRequest):
                 }
             }
 
-        # --------------------------------------------------------
-        # INKLING
-        #
-        # ВАЖНО:
-        # Никаких reasoning_effort / enable_thinking.
-        #
-        # NVIDIA сама включает reasoning для Inkling.
-        # --------------------------------------------------------
-
         elif "inkling" in model_lower:
+            print("Inkling: native reasoning")
 
-            print("🧠 Inkling: native reasoning, без принудительных параметров")
-
-        # ========================================================
-        # REQUEST TO NVIDIA
-        # ========================================================
-
-        print("🔄 Отправка запроса в NVIDIA...")
+        print("Sending request to NVIDIA...")
 
         try:
-
             completion = client.chat.completions.create(**params)
-
-            print("✅ NVIDIA приняла запрос")
+            print("NVIDIA accepted request")
 
         except APIError as e:
-
-            print(f"❌ NVIDIA API Error: {str(e)}")
+            print(f"NVIDIA API Error: {str(e)}")
 
             error_body = getattr(e, "body", None)
 
             if error_body:
-                print(f"📄 NVIDIA error body: {error_body}")
+                print(f"NVIDIA error body: {error_body}")
 
             return JSONResponse(
                 status_code=getattr(e, "status_code", None) or 500,
@@ -335,8 +219,7 @@ async def chat_completions(request: ChatRequest):
             )
 
         except Exception as e:
-
-            print(f"❌ Ошибка при запросе NVIDIA: {str(e)}")
+            print(f"NVIDIA request error: {str(e)}")
 
             import traceback
             traceback.print_exc()
@@ -351,24 +234,12 @@ async def chat_completions(request: ChatRequest):
                 }
             )
 
-        # ========================================================
-        # STREAMING
-        # ========================================================
-
         if request.stream:
-
-            print("🌊 Запущен streaming")
+            print("Streaming started")
 
             async def generate():
-
                 try:
-
                     for chunk in completion:
-
-                        # ------------------------------------------------
-                        # Проверяем choices
-                        # ------------------------------------------------
-
                         if not hasattr(chunk, "choices"):
                             continue
 
@@ -384,10 +255,6 @@ async def chat_completions(request: ChatRequest):
                         if delta is None:
                             continue
 
-                        # ------------------------------------------------
-                        # Создаём SSE response
-                        # ------------------------------------------------
-
                         response_data = {
                             "choices": [
                                 {
@@ -396,10 +263,6 @@ async def chat_completions(request: ChatRequest):
                             ]
                         }
 
-                        # ------------------------------------------------
-                        # Обычный текст
-                        # ------------------------------------------------
-
                         content = getattr(
                             delta,
                             "content",
@@ -407,20 +270,13 @@ async def chat_completions(request: ChatRequest):
                         )
 
                         if content:
-
-                            response_data["choices"][0]["delta"][
-                                "content"
-                            ] = content
+                            response_data["choices"][0]["delta"]["content"] = content
 
                             print(
                                 content,
                                 end="",
                                 flush=True
                             )
-
-                        # ------------------------------------------------
-                        # Reasoning
-                        # ------------------------------------------------
 
                         reasoning = getattr(
                             delta,
@@ -429,7 +285,6 @@ async def chat_completions(request: ChatRequest):
                         )
 
                         if not reasoning:
-
                             reasoning = getattr(
                                 delta,
                                 "reasoning",
@@ -437,20 +292,14 @@ async def chat_completions(request: ChatRequest):
                             )
 
                         if reasoning:
-
                             response_data["choices"][0]["delta"][
                                 "reasoning_content"
                             ] = reasoning
 
                             print(
-                                f"\n🧠 [reasoning chunk] "
-                                f"{len(reasoning)} chars",
+                                f"\n[reasoning: {len(reasoning)} chars]",
                                 flush=True
                             )
-
-                        # ------------------------------------------------
-                        # Отправляем SSE
-                        # ------------------------------------------------
 
                         yield (
                             "data: "
@@ -461,12 +310,11 @@ async def chat_completions(request: ChatRequest):
                             + "\n\n"
                         )
 
-                    print("\n✅ Streaming завершён")
+                    print("\nStreaming finished")
 
                 except Exception as e:
-
                     print(
-                        f"\n❌ Ошибка во время streaming: {str(e)}"
+                        f"\nStreaming error: {str(e)}"
                     )
 
                     import traceback
@@ -489,9 +337,6 @@ async def chat_completions(request: ChatRequest):
                     )
 
                 finally:
-
-                    print("📤 Отправляем [DONE]")
-
                     yield "data: [DONE]\n\n"
 
             return StreamingResponse(
@@ -504,25 +349,15 @@ async def chat_completions(request: ChatRequest):
                 }
             )
 
-        # ========================================================
-        # NON-STREAMING
-        # ========================================================
-
-        print("📦 Получен обычный ответ")
+        print("Non-streaming response")
 
         if not hasattr(completion, "choices"):
-
-            print("❌ В ответе отсутствует choices")
-
             try:
-
                 if hasattr(completion, "model_dump"):
                     raw = completion.model_dump()
                 else:
                     raw = str(completion)
-
             except Exception:
-
                 raw = str(completion)
 
             return JSONResponse(
@@ -537,7 +372,6 @@ async def chat_completions(request: ChatRequest):
             )
 
         if not completion.choices:
-
             return JSONResponse(
                 status_code=500,
                 content={
@@ -548,10 +382,6 @@ async def chat_completions(request: ChatRequest):
                 }
             )
 
-        # ========================================================
-        # MESSAGE
-        # ========================================================
-
         choice = completion.choices[0]
 
         message = getattr(
@@ -561,7 +391,6 @@ async def chat_completions(request: ChatRequest):
         )
 
         if message is None:
-
             return JSONResponse(
                 status_code=500,
                 content={
@@ -585,7 +414,6 @@ async def chat_completions(request: ChatRequest):
         )
 
         if not reasoning:
-
             reasoning = getattr(
                 message,
                 "reasoning",
@@ -593,18 +421,13 @@ async def chat_completions(request: ChatRequest):
             )
 
         print(
-            f"📝 Контент: {len(content or '')} символов"
+            f"Content: {len(content or '')} chars"
         )
 
         if reasoning:
-
             print(
-                f"🧠 Reasoning: {len(reasoning)} символов"
+                f"Reasoning: {len(reasoning)} chars"
             )
-
-        # ========================================================
-        # RESPONSE
-        # ========================================================
 
         response_data = {
             "choices": [
@@ -628,27 +451,15 @@ async def chat_completions(request: ChatRequest):
             }
         }
 
-        # --------------------------------------------------------
-        # Добавляем reasoning
-        # --------------------------------------------------------
-
         if reasoning:
-
             response_data["choices"][0]["message"][
                 "reasoning_content"
             ] = reasoning
 
-        print("📤 Отправляем обычный ответ")
-
         return JSONResponse(response_data)
 
-    # ============================================================
-    # GLOBAL ERROR
-    # ============================================================
-
     except Exception as e:
-
-        print(f"❌ Критическая ошибка: {str(e)}")
+        print(f"Critical error: {str(e)}")
 
         import traceback
         traceback.print_exc()
@@ -664,38 +475,30 @@ async def chat_completions(request: ChatRequest):
         )
 
 
-# ============================================================
-# ROOT
-# ============================================================
-
 @app.get("/")
 async def root():
-
     return {
         "status": "ok",
-        "message": "NVIDIA Proxy for ChubAI"
+        "message": "NVIDIA Proxy for JanitorAI"
     }
 
 
-# ============================================================
-# HEALTH
-# ============================================================
-
 @app.get("/health")
 async def health():
-
     return {
         "status": "healthy"
     }
 
 
-# ============================================================
-# START
-# ============================================================
-
 if __name__ == "__main__":
+    port = int(os.getenv("PORT", 8000))
 
-    port = int(
-        os.getenv(
-            "PORT",
-       
+    print(
+        f"Starting NVIDIA Proxy on port {port}"
+    )
+
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=port
+            )
