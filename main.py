@@ -7,7 +7,7 @@ import os
 import uvicorn
 import json
 
-app = FastAPI(title="NVIDIA Proxy for JanitorAI")
+app = FastAPI(title="NVIDIA Proxy for ChubAI")
 
 # ============================================================
 # CORS
@@ -63,12 +63,20 @@ async def list_models():
         "object": "list",
         "data": [
 
+            # ----------------------------------------------------
+            # GLM
+            # ----------------------------------------------------
+
             {
                 "id": "z-ai/glm-5.2",
                 "object": "model",
                 "created": 1700000000,
                 "owned_by": "nvidia"
             },
+
+            # ----------------------------------------------------
+            # MINIMAX M3
+            # ----------------------------------------------------
 
             {
                 "id": "minimaxai/minimax-m3",
@@ -77,6 +85,21 @@ async def list_models():
                 "owned_by": "nvidia"
             },
 
+            # ----------------------------------------------------
+            # THINKING MACHINES INKLING
+            # ----------------------------------------------------
+
+            {
+                "id": "thinkingmachines/inkling",
+                "object": "model",
+                "created": 1700000000,
+                "owned_by": "nvidia"
+            },
+
+            # ----------------------------------------------------
+            # DEEPSEEK V4 FLASH
+            # ----------------------------------------------------
+
             {
                 "id": "deepseek-ai/deepseek-v4-flash",
                 "object": "model",
@@ -84,12 +107,20 @@ async def list_models():
                 "owned_by": "nvidia"
             },
 
+            # ----------------------------------------------------
+            # DEEPSEEK V4 PRO
+            # ----------------------------------------------------
+
             {
                 "id": "deepseek-ai/deepseek-v4-pro",
                 "object": "model",
                 "created": 1700000000,
                 "owned_by": "nvidia"
             },
+
+            # ----------------------------------------------------
+            # LLAMA
+            # ----------------------------------------------------
 
             {
                 "id": "meta/llama-3.1-8b-instruct",
@@ -104,6 +135,10 @@ async def list_models():
                 "created": 1700000000,
                 "owned_by": "nvidia"
             },
+
+            # ----------------------------------------------------
+            # NEMOTRON
+            # ----------------------------------------------------
 
             {
                 "id": "nvidia/nemotron-mini-4b-instruct",
@@ -197,7 +232,7 @@ async def chat_completions(request: ChatRequest):
             or "minimax_m3" in model_lower
         ):
 
-            print("🧠 MiniMax M3: reasoning mode")
+            print("🧠 MiniMax M3: native reasoning")
 
             params["extra_body"] = {
                 "chat_template_kwargs": {
@@ -253,6 +288,19 @@ async def chat_completions(request: ChatRequest):
                     "reasoning_effort": "max"
                 }
             }
+
+        # --------------------------------------------------------
+        # INKLING
+        #
+        # ВАЖНО:
+        # Никаких reasoning_effort / enable_thinking.
+        #
+        # NVIDIA сама включает reasoning для Inkling.
+        # --------------------------------------------------------
+
+        elif "inkling" in model_lower:
+
+            print("🧠 Inkling: native reasoning, без принудительных параметров")
 
         # ========================================================
         # REQUEST TO NVIDIA
@@ -317,6 +365,10 @@ async def chat_completions(request: ChatRequest):
 
                     for chunk in completion:
 
+                        # ------------------------------------------------
+                        # Проверяем choices
+                        # ------------------------------------------------
+
                         if not hasattr(chunk, "choices"):
                             continue
 
@@ -331,6 +383,10 @@ async def chat_completions(request: ChatRequest):
 
                         if delta is None:
                             continue
+
+                        # ------------------------------------------------
+                        # Создаём SSE response
+                        # ------------------------------------------------
 
                         response_data = {
                             "choices": [
@@ -393,7 +449,7 @@ async def chat_completions(request: ChatRequest):
                             )
 
                         # ------------------------------------------------
-                        # SSE
+                        # Отправляем SSE
                         # ------------------------------------------------
 
                         yield (
@@ -572,6 +628,10 @@ async def chat_completions(request: ChatRequest):
             }
         }
 
+        # --------------------------------------------------------
+        # Добавляем reasoning
+        # --------------------------------------------------------
+
         if reasoning:
 
             response_data["choices"][0]["message"][
@@ -613,7 +673,7 @@ async def root():
 
     return {
         "status": "ok",
-        "message": "NVIDIA Proxy for JanitorAI"
+        "message": "NVIDIA Proxy for ChubAI"
     }
 
 
@@ -638,16 +698,4 @@ if __name__ == "__main__":
     port = int(
         os.getenv(
             "PORT",
-            8000
-        )
-    )
-
-    print(
-        f"🚀 Запуск NVIDIA Proxy на порту {port}"
-    )
-
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=port
-    )
+       
