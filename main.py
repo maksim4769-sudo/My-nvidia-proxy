@@ -62,36 +62,49 @@ async def list_models():
     return JSONResponse({
         "object": "list",
         "data": [
+
             {
                 "id": "z-ai/glm-5.2",
                 "object": "model",
                 "created": 1700000000,
                 "owned_by": "nvidia"
             },
+
+            {
+                "id": "minimaxai/minimax-m3",
+                "object": "model",
+                "created": 1700000000,
+                "owned_by": "nvidia"
+            },
+
             {
                 "id": "deepseek-ai/deepseek-v4-flash",
                 "object": "model",
                 "created": 1700000000,
                 "owned_by": "nvidia"
             },
+
             {
                 "id": "deepseek-ai/deepseek-v4-pro",
                 "object": "model",
                 "created": 1700000000,
                 "owned_by": "nvidia"
             },
+
             {
                 "id": "meta/llama-3.1-8b-instruct",
                 "object": "model",
                 "created": 1700000000,
                 "owned_by": "nvidia"
             },
+
             {
                 "id": "meta/llama-3.1-70b-instruct",
                 "object": "model",
                 "created": 1700000000,
                 "owned_by": "nvidia"
             },
+
             {
                 "id": "nvidia/nemotron-mini-4b-instruct",
                 "object": "model",
@@ -160,6 +173,10 @@ async def chat_completions(request: ChatRequest):
 
         model_lower = request.model.lower()
 
+        # --------------------------------------------------------
+        # GLM-5.2
+        # --------------------------------------------------------
+
         if "glm-5.2" in model_lower:
 
             print("🧠 GLM-5.2: включаем reasoning")
@@ -171,6 +188,27 @@ async def chat_completions(request: ChatRequest):
                 "reasoning_effort": "max"
             }
 
+        # --------------------------------------------------------
+        # MINIMAX M3
+        # --------------------------------------------------------
+
+        elif (
+            "minimax-m3" in model_lower
+            or "minimax_m3" in model_lower
+        ):
+
+            print("🧠 MiniMax M3: reasoning mode")
+
+            params["extra_body"] = {
+                "chat_template_kwargs": {
+                    "enable_thinking": True
+                }
+            }
+
+        # --------------------------------------------------------
+        # DEEPSEEK V4 FLASH
+        # --------------------------------------------------------
+
         elif "deepseek-v4-flash" in model_lower:
 
             print("🧠 DeepSeek V4 Flash: включаем reasoning")
@@ -181,6 +219,10 @@ async def chat_completions(request: ChatRequest):
                     "reasoning_effort": "max"
                 }
             }
+
+        # --------------------------------------------------------
+        # DEEPSEEK V4 PRO
+        # --------------------------------------------------------
 
         elif "deepseek-v4-pro" in model_lower:
 
@@ -194,6 +236,10 @@ async def chat_completions(request: ChatRequest):
                     "reasoning_effort": "max"
                 }
             }
+
+        # --------------------------------------------------------
+        # DEEPSEEK V4
+        # --------------------------------------------------------
 
         elif "deepseek-v4" in model_lower:
 
@@ -259,11 +305,6 @@ async def chat_completions(request: ChatRequest):
 
         # ========================================================
         # STREAMING
-        #
-        # ВАЖНО:
-        # При stream=True completion является итератором.
-        # Нельзя обращаться к completion.choices[0].message
-        # до обработки этого итератора.
         # ========================================================
 
         if request.stream:
@@ -276,7 +317,6 @@ async def chat_completions(request: ChatRequest):
 
                     for chunk in completion:
 
-                        # Иногда API может прислать chunk без choices
                         if not hasattr(chunk, "choices"):
                             continue
 
@@ -353,7 +393,7 @@ async def chat_completions(request: ChatRequest):
                             )
 
                         # ------------------------------------------------
-                        # Отправляем SSE chunk
+                        # SSE
                         # ------------------------------------------------
 
                         yield (
@@ -419,12 +459,14 @@ async def chat_completions(request: ChatRequest):
             print("❌ В ответе отсутствует choices")
 
             try:
+
                 if hasattr(completion, "model_dump"):
                     raw = completion.model_dump()
                 else:
                     raw = str(completion)
 
             except Exception:
+
                 raw = str(completion)
 
             return JSONResponse(
