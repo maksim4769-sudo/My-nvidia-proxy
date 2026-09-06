@@ -102,7 +102,16 @@ async def chat_completions(request: ChatRequest):
         model_lower = request.model.lower()
 
         if "deepseek-v4-pro-0813" in model_lower:
-            print("DeepSeek V4 Pro 0813: default reasoning settings")
+            print("DeepSeek V4 Pro 0813: maximum reasoning enabled")
+
+            params["reasoning_effort"] = "max"
+
+            params["extra_body"] = {
+                "chat_template_kwargs": {
+                    "thinking": True,
+                    "reasoning_effort": "max"
+                }
+            }
 
         elif "kimi-k3" in model_lower:
             print("Kimi K3: default settings")
