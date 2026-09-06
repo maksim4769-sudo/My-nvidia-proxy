@@ -46,49 +46,13 @@ async def list_models():
         "object": "list",
         "data": [
             {
-                "id": "z-ai/glm-5.2",
+                "id": "deepseek-ai/deepseek-v4-pro-0813",
                 "object": "model",
                 "created": 1700000000,
                 "owned_by": "nvidia"
             },
             {
-                "id": "minimaxai/minimax-m3",
-                "object": "model",
-                "created": 1700000000,
-                "owned_by": "nvidia"
-            },
-            {
-                "id": "thinkingmachines/inkling",
-                "object": "model",
-                "created": 1700000000,
-                "owned_by": "nvidia"
-            },
-            {
-                "id": "deepseek-ai/deepseek-v4-flash",
-                "object": "model",
-                "created": 1700000000,
-                "owned_by": "nvidia"
-            },
-            {
-                "id": "deepseek-ai/deepseek-v4-pro",
-                "object": "model",
-                "created": 1700000000,
-                "owned_by": "nvidia"
-            },
-            {
-                "id": "meta/llama-3.1-8b-instruct",
-                "object": "model",
-                "created": 1700000000,
-                "owned_by": "nvidia"
-            },
-            {
-                "id": "meta/llama-3.1-70b-instruct",
-                "object": "model",
-                "created": 1700000000,
-                "owned_by": "nvidia"
-            },
-            {
-                "id": "nvidia/nemotron-mini-4b-instruct",
+                "id": "moonshotai/kimi-k3",
                 "object": "model",
                 "created": 1700000000,
                 "owned_by": "nvidia"
@@ -137,37 +101,8 @@ async def chat_completions(request: ChatRequest):
 
         model_lower = request.model.lower()
 
-        if "glm-5.2" in model_lower:
-            print("GLM-5.2: reasoning enabled")
-
-            params["extra_body"] = {
-                "chat_template_kwargs": {
-                    "enable_thinking": True
-                },
-                "reasoning_effort": "max"
-            }
-
-        elif "minimax-m3" in model_lower or "minimax_m3" in model_lower:
-            print("MiniMax M3: native reasoning")
-
-            params["extra_body"] = {
-                "chat_template_kwargs": {
-                    "enable_thinking": True
-                }
-            }
-
-        elif "deepseek-v4-flash" in model_lower:
-            print("DeepSeek V4 Flash: reasoning enabled")
-
-            params["extra_body"] = {
-                "chat_template_kwargs": {
-                    "thinking": True,
-                    "reasoning_effort": "max"
-                }
-            }
-
-        elif "deepseek-v4-pro" in model_lower:
-            print("DeepSeek V4 Pro: reasoning enabled")
+        if "deepseek-v4-pro-0813" in model_lower:
+            print("DeepSeek V4 Pro 0813: maximum reasoning enabled")
 
             params["reasoning_effort"] = "max"
 
@@ -178,20 +113,8 @@ async def chat_completions(request: ChatRequest):
                 }
             }
 
-        elif "deepseek-v4" in model_lower:
-            print("DeepSeek V4: reasoning enabled")
-
-            params["reasoning_effort"] = "max"
-
-            params["extra_body"] = {
-                "chat_template_kwargs": {
-                    "thinking": True,
-                    "reasoning_effort": "max"
-                }
-            }
-
-        elif "inkling" in model_lower:
-            print("Inkling: native reasoning")
+        elif "kimi-k3" in model_lower:
+            print("Kimi K3: default settings")
 
         print("Sending request to NVIDIA...")
 
@@ -501,4 +424,4 @@ if __name__ == "__main__":
         app,
         host="0.0.0.0",
         port=port
-            )
+    )
