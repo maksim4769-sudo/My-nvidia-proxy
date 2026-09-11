@@ -123,7 +123,10 @@ async def chat_completions(request: ChatRequest):
             print("Kimi K3: default settings")
 
         elif "nemotron-3-ultra-550b-a55b" in model_lower:
-            print("Nemotron 3 Ultra 550B A55B: default NVIDIA reasoning settings")
+            print("Nemotron 3 Ultra 550B A55B: maximum reasoning enabled")
+
+            params["reasoning_effort"] = "high"
+            params["reasoning_budget"] = -1
 
         print("Sending request to NVIDIA...")
 
@@ -433,4 +436,4 @@ if __name__ == "__main__":
         app,
         host="0.0.0.0",
         port=port
-                            )
+    )
