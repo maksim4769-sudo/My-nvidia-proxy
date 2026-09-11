@@ -126,7 +126,6 @@ async def chat_completions(request: ChatRequest):
             print("Nemotron 3 Ultra 550B A55B: maximum reasoning enabled")
 
             params["reasoning_effort"] = "high"
-            params["reasoning_budget"] = -1
 
         print("Sending request to NVIDIA...")
 
