@@ -28,7 +28,6 @@ client = OpenAI(
     api_key=NVIDIA_API_KEY
 )
 
-
 class ChatRequest(BaseModel):
     model: str
     messages: list
@@ -38,7 +37,6 @@ class ChatRequest(BaseModel):
     top_p: float = 1.0
     frequency_penalty: float = 0.0
     presence_penalty: float = 0.0
-
 
 @app.get("/v1/models")
 async def list_models():
@@ -52,20 +50,19 @@ async def list_models():
                 "owned_by": "nvidia"
             },
             {
-                "id": "moonshotai/kimi-k3",
+                "id": "deepseek-ai/deepseek-v4-flash-0731",
                 "object": "model",
                 "created": 1700000000,
                 "owned_by": "nvidia"
             },
             {
-                "id": "openai/gpt-oss-20b",
+                "id": "moonshotai/kimi-k3",
                 "object": "model",
                 "created": 1700000000,
                 "owned_by": "nvidia"
             }
         ]
     })
-
 
 @app.options("/v1/chat/completions")
 @app.options("/{path:path}")
@@ -78,7 +75,6 @@ async def options_all(path: str = ""):
             "Access-Control-Allow-Headers": "*",
         }
     )
-
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatRequest):
@@ -119,13 +115,20 @@ async def chat_completions(request: ChatRequest):
                 }
             }
 
+        elif "deepseek-v4-flash-0731" in model_lower:
+            print("DeepSeek V4 Flash 0731: maximum reasoning enabled")
+
+            params["reasoning_effort"] = "max"
+
+            params["extra_body"] = {
+                "chat_template_kwargs": {
+                    "thinking": True,
+                    "reasoning_effort": "max"
+                }
+            }
+
         elif "kimi-k3" in model_lower:
             print("Kimi K3: default settings")
-
-        elif "gpt-oss-20b" in model_lower:
-            print("GPT-OSS 20B: maximum reasoning enabled")
-
-            params["reasoning_effort"] = "high"
 
         print("Sending request to NVIDIA...")
 
@@ -408,7 +411,6 @@ async def chat_completions(request: ChatRequest):
             }
         )
 
-
 @app.get("/")
 async def root():
     return {
@@ -416,13 +418,11 @@ async def root():
         "message": "NVIDIA Proxy for JanitorAI"
     }
 
-
 @app.get("/health")
 async def health():
     return {
         "status": "healthy"
     }
-
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
@@ -435,4 +435,4 @@ if __name__ == "__main__":
         app,
         host="0.0.0.0",
         port=port
-                            )
+    )
