@@ -134,7 +134,8 @@ async def chat_completions(request: ChatRequest):
             }
 
         elif "kimi-k3" in model_lower:
-            print("Kimi K3: default settings")
+            print("Kimi K3: maximum reasoning enabled")
+            params["reasoning_effort"] = "max"
 
         elif "glm-5-3" in model_lower:
             print("GLM 5.3: maximum reasoning enabled")
