@@ -1,3 +1,4 @@
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -62,7 +63,7 @@ async def list_models():
                 "owned_by": "nvidia"
             },
             {
-                "id": "z-ai/glm-5-3",
+                "id": "z-ai/glm-5.3",
                 "object": "model",
                 "created": 1700000000,
                 "owned_by": "nvidia"
@@ -134,10 +135,9 @@ async def chat_completions(request: ChatRequest):
             }
 
         elif "kimi-k3" in model_lower:
-            print("Kimi K3: maximum reasoning enabled")
-            params["reasoning_effort"] = "max"
+            print("Kimi K3: default settings")
 
-        elif "glm-5-3" in model_lower:
+        elif "z-ai/glm-5.3" in model_lower:
             print("GLM 5.3: maximum reasoning enabled")
 
             params["reasoning_effort"] = "max"
@@ -447,4 +447,5 @@ if __name__ == "__main__":
         app,
         host="0.0.0.0",
         port=port
-    )
+        )
+    
