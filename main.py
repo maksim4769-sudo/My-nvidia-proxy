@@ -38,6 +38,7 @@ class ChatRequest(BaseModel):
     frequency_penalty: float = 0.0
     presence_penalty: float = 0.0
 
+
 @app.get("/v1/models")
 async def list_models():
     return JSONResponse({
@@ -70,6 +71,7 @@ async def list_models():
         ]
     })
 
+
 @app.options("/v1/chat/completions")
 @app.options("/{path:path}")
 async def options_all(path: str = ""):
@@ -81,6 +83,7 @@ async def options_all(path: str = ""):
             "Access-Control-Allow-Headers": "*",
         }
     )
+
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatRequest):
@@ -136,8 +139,8 @@ async def chat_completions(request: ChatRequest):
         elif "kimi-k3" in model_lower:
             print("Kimi K3: default settings")
 
-        elif "z-ai/glm-5.3" in model_lower:
-            print("GLM 5.3: maximum reasoning enabled")
+        elif "glm-5" in model_lower:  # ловит glm-5.3 и последующие версии
+            print("GLM 5.x: maximum reasoning enabled")
 
             params["reasoning_effort"] = "max"
 
@@ -422,6 +425,7 @@ async def chat_completions(request: ChatRequest):
             }
         )
 
+
 @app.get("/")
 async def root():
     return {
@@ -429,11 +433,13 @@ async def root():
         "message": "NVIDIA Proxy for JanitorAI"
     }
 
+
 @app.get("/health")
 async def health():
     return {
         "status": "healthy"
     }
+
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
@@ -446,5 +452,4 @@ if __name__ == "__main__":
         app,
         host="0.0.0.0",
         port=port
-        )
-    
+    )
