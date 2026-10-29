@@ -138,13 +138,13 @@ async def chat_completions(request: ChatRequest):
         elif "kimi-k3" in model_lower:
             print("Kimi K3: default settings")
 
-        elif "glm-5" in model_lower:  # ловит glm-5.3 и последующие версии
+        elif "glm-5" in model_lower:
             print("GLM 5.x: maximum reasoning enabled")
             params["reasoning_effort"] = "max"
 
         elif "mistral-large-4" in model_lower:
-            print("Mistral Large 4: minimum thinking (none)")
-            params["reasoning_effort"] = "none"
+            print("Mistral Large 4: low thinking")
+            params["reasoning_effort"] = "low"
 
         print("Sending request to NVIDIA...")
 
